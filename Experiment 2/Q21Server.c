@@ -3,19 +3,37 @@
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <pthread.h> // Required for pthreads
 
-struct sockaddr_in server_addr;
-
-void *handle_client (int client_fd, char buffer[1024]) 
+// Thread worker function
+void *handle_client(void *client_void_ptr) 
 {
-    read(client_fd, buffer, sizeof(buffer));
+    // Retrieve the socket file descriptor and free the allocated memory wrapper
+    int client_fd = *(int *)client_void_ptr;
+    free(client_void_ptr);
+
+    char buffer[1024] = {0};
     
-    FILE *file;
+    // Read data from the client safely
+    ssize_t bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
+    if (bytes_read <= 0) {
+        close(client_fd);
+        return NULL;
+    }
+
+    // Strip trailing newlines or carriage returns that often come from network sockets
+    buffer[strcspn(buffer, "\r\n")] = 0;
+    
+    FILE *file = fopen("students.csv", "r");
+    if (file == NULL) {
+        perror("Failed to open students.csv");
+        close(client_fd);
+        return NULL;
+    }
+
     char linebuf[1024];
     int lineno = 0;
     int found = 0;
-
-    file = fopen("students.csv", "r");
 
     while (fgets(linebuf, sizeof(linebuf), file) != NULL)
     {
@@ -25,51 +43,77 @@ void *handle_client (int client_fd, char buffer[1024])
             printf("Match found at line %d: %s", lineno, linebuf); 
             found = 1;
         }
-
     }
-     if (!found) {
+
+    if (!found) {
         printf("The string '%s' was not found in the file.\n", buffer);
-        
     }
 
     fclose(file);
-    retun NULL;
+    close(client_fd); // Close the socket connection when done
+    return NULL;
 }
 
 int main()
 {
-    int server_fd, client_fd;
-    char buffer[1024] = {0};
+    int server_fd;
+    struct sockaddr_in server_addr;
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Allow quick reuse of the port to prevent "Address already in use" errors
+    int opt = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
-
     server_addr.sin_port = htons(8080);
 
-    bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Bind failed");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
 
-    listen(server_fd, 5);
+    if (listen(server_fd, 5) < 0) {
+        perror("Listen failed");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
 
-    printf("Server is waiting:");
+    printf("Server is waiting on port 8080...\n");
 
     while(1)
     {
-        int *client_fd = malloc(sizeof(int));
-        client_fd = accept(server_fd, NULL, NULL);
+        // Allocate space for the client descriptor so threads don't clash
+        int *new_sock = malloc(sizeof(int));
+        if (new_sock == NULL) {
+            perror("Malloc failed");
+            continue;
+        }
 
-        pthread_create(&thread_id, NULL, handle_client(client_fd, buffer), (void*)new_sock);
-    
-        pthread_detach(thread_id);
+        *new_sock = accept(server_fd, NULL, NULL);
+        if (*new_sock < 0) {
+            perror("Accept failed");
+            free(new_sock);
+            continue;
+        }
+
+        pthread_t thread_id;
+        // Pass the function pointer and the pointer to our connection ID
+        if (pthread_create(&thread_id, NULL, handle_client, (void *)new_sock) == 0) {
+            pthread_detach(thread_id); // Clean up thread resources automatically upon exit
+        } else {
+            perror("Could not create thread");
+            close(*new_sock);
+            free(new_sock);
+        }
     }
 
-}
-
-    
-
-    close(client_fd);
     close(server_fd);
-
     return 0;
 }
-
