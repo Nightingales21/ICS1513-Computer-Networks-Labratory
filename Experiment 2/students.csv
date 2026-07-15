@@ -1,6 +1,6 @@
 Roll Number,Name,Department,Semester,CGPA
-,Alice Smith,Computer Science,6,3.85
-CS202602,Bob Jones,Computer Science,6,3.42
-EE202601,Charlie Brown,Electrical Engineering,4,3.91
-ME202601,Diana Prince,Mechanical Engineering,8,3.65
-EC202601,Evan Wright,Electronics and Communication,2,3.12
+101,Alice Smith,Computer Science,6,3.85
+102,Bob Jones,Computer Science,6,3.42
+103,Charlie Brown,Electrical Engineering,4,3.91
+104,Diana Prince,Mechanical Engineering,8,3.65
+105,Evan Wright,Electronics and Communication,2,3.12

@@ -3,9 +3,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include <pthread.h> // Required for pthreads
+#include <pthread.h> 
 
-// Thread worker function
 void *handle_client(void *client_void_ptr) 
 {
     // Retrieve the socket file descriptor and free the allocated memory wrapper
@@ -65,7 +64,6 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    // Allow quick reuse of the port to prevent "Address already in use" errors
     int opt = 1;
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
@@ -89,7 +87,6 @@ int main()
 
     while(1)
     {
-        // Allocate space for the client descriptor so threads don't clash
         int *new_sock = malloc(sizeof(int));
         if (new_sock == NULL) {
             perror("Malloc failed");
@@ -104,9 +101,8 @@ int main()
         }
 
         pthread_t thread_id;
-        // Pass the function pointer and the pointer to our connection ID
         if (pthread_create(&thread_id, NULL, handle_client, (void *)new_sock) == 0) {
-            pthread_detach(thread_id); // Clean up thread resources automatically upon exit
+            pthread_detach(thread_id);
         } else {
             perror("Could not create thread");
             close(*new_sock);
