@@ -3,54 +3,68 @@
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include <pthread.h> 
+#include <pthread.h>
 
-void *handle_client(void *client_void_ptr) 
+void *handle_client(void *client_void_ptr)
 {
-    // Retrieve the socket file descriptor and free the allocated memory wrapper
     int client_fd = *(int *)client_void_ptr;
     free(client_void_ptr);
 
     char buffer[1024] = {0};
-    
-    // Read data from the client safely
+    char response[1024] = {0};
+
     ssize_t bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
     if (bytes_read <= 0) {
         close(client_fd);
         return NULL;
     }
 
-    // Strip trailing newlines or carriage returns that often come from network sockets
     buffer[strcspn(buffer, "\r\n")] = 0;
-    
+
     FILE *file = fopen("students.csv", "r");
     if (file == NULL) {
         perror("Failed to open students.csv");
+        strcpy(response, "Error: students.csv not found");
+        write(client_fd, response, strlen(response));
         close(client_fd);
         return NULL;
-        
     }
 
     char linebuf[1024];
-    int lineno = 0;
     int found = 0;
 
     while (fgets(linebuf, sizeof(linebuf), file) != NULL)
     {
-        lineno++;
-        if (strstr(linebuf, buffer) != NULL)
+        linebuf[strcspn(linebuf, "\r\n")] = 0;
+
+        char temp_line[1024];
+        strcpy(temp_line, linebuf);
+
+        char *roll_no = strtok(temp_line, ",");
+        if (roll_no && strcmp(roll_no, buffer) == 0)
         {
-            printf("Match found at line %d: %s", lineno, linebuf); 
+            char *name = strtok(NULL, ",");
+            if (name) {
+                snprintf(response, sizeof(response), "Roll Number: %s\nStudent Name: %s", roll_no, name);
+            } else {
+                snprintf(response, sizeof(response), "Roll Number: %s\nStudent Name: Unknown", roll_no);
+            }
             found = 1;
+            break;
         }
     }
 
+    fclose(file);
+
     if (!found) {
-        printf("The string '%s' was not found in the file.\n", buffer);
+        snprintf(response, sizeof(response), "Student Record Not Found for roll number %s", buffer);
     }
 
-    fclose(file);
-    close(client_fd); // Close the socket connection when done
+    if (write(client_fd, response, strlen(response)) < 0) {
+        perror("Failed to send response");
+    }
+
+    close(client_fd);
     return NULL;
 }
 
@@ -86,7 +100,7 @@ int main()
 
     printf("Server is waiting on port 8080...\n");
 
-    while(1)
+    while (1)
     {
         int *new_sock = malloc(sizeof(int));
         if (new_sock == NULL) {
