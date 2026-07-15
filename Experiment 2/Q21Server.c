@@ -28,6 +28,7 @@ void *handle_client(void *client_void_ptr)
         perror("Failed to open students.csv");
         close(client_fd);
         return NULL;
+        
     }
 
     char linebuf[1024];

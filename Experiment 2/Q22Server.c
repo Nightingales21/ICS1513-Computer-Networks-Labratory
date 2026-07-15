@@ -31,6 +31,8 @@ void search_student(const char *roll_no, char *response)
             break;
         }
     }
+
+    fclose(file);
 }
 
 int main()
