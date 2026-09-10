@@ -128,11 +128,8 @@ void RunOnce (std::string delay,
 }
 
 int
-main (int argc, char *argv[])
+main ()
 {
-  CommandLine cmd;
-  cmd.Parse (argc, argv);
-
   // The latency values we want to test -- add/remove values here freely
   std::vector<std::string> delays = {"2ms", "5ms", "10ms", "20ms"};
 
